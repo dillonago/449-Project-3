@@ -1,4 +1,4 @@
--- $ sqlite3 ./var/game.db < ./share/game.sql
+-- $ sqlite3 ./var/primary/mount/game.db < ./share/game.sql
 
 
 PRAGMA foreign_keys=ON;
