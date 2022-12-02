@@ -1,4 +1,3 @@
-
 from cmath import e
 import collections
 import dataclasses
@@ -8,23 +7,20 @@ import databases
 import toml
 import random
 import uuid
-
 from quart import Quart, g, request, abort
-# from quart_auth import basic_auth_required
-
-from quart_schema import QuartSchema, RequestSchemaValidationError, validate_request
+from quart_schema import QuartSchema, RequestSchemaValidationError, validate_request, tag
 
 app = Quart(__name__)
-QuartSchema(app)
+QuartSchema(app, tags=[
+    {"name": "Root", "description": "Root path."},
+    {"name": "Games", "description": "APIs for game endpoints."}])
 
 app.config.from_file(f"./etc/{__name__}.toml", toml.load)
-
 
 @dataclasses.dataclass
 class guess:
     game_id: str
     guess_word: str
-
 
 async def _get_db():
     db = getattr(g, "_sqlite_db", None)
@@ -39,8 +35,11 @@ async def close_connection(exception):
     if db is not None:
         await db.disconnect()
 
+# route endpoint
 @app.route("/")
+@tag(["Root"])
 def index():
+    """ Returns HTML content. """
     return textwrap.dedent(
         """
         <h1>Welcome to the Wordle</h1>
@@ -48,32 +47,29 @@ def index():
         """
     )
 
-
+# status codes
 @app.errorhandler(RequestSchemaValidationError)
 def bad_request(e):
     return {"error": str(e.validation_error)}, 400
-
 
 @app.errorhandler(409)
 def conflict(e):
     return {"error": str(e)}, 409
 
-
 @app.errorhandler(401)
 def not_found(e):
     return {"error": "Unauthorized"}, 401
-
-# End of User API
-
+###################### End of User API ######################
 
 
-# Start of Game API
 
+###################### Start of Game API ######################
+# status code
 @app.errorhandler(404)
 def not_found(e):
     return {"error": str(e)}, 404
 
-# Check if game_id present in db 
+# check if game_id present in db 
 async def validate_game_id(game_id):
     db = await _get_db()
     app.logger.info("SELECT game_id FROM Game WHERE game_id = "+str(game_id))
@@ -94,10 +90,11 @@ async def update_inprogress(game_id):
     else:
         abort(417, "Failed to create entry in In_Progress table")
 
-
-# New Game API
+# new game endpoint
+@tag(["Games"])
 @app.route("/newgame", methods=["POST"])
 async def newgame():
+    """ Start a new game. """
     db = await _get_db()
     auth=request.authorization
     app.logger.info("SELECT correct_word FROM Correct_Words")
@@ -115,30 +112,31 @@ async def newgame():
     else:
          abort(417, "New game creation failed")
 
-
+# status code
 @app.errorhandler(417)
 def not_found(e):
     return {"error": str(e)}, 417
 
-
-#Guess API
+# guess API
+@tag(["Games"])
 @app.route("/guess", methods=["POST"])
 @validate_request(guess)
 async def guess(data):
+    """ User makes a guess. """
     db = await _get_db() 
     auth=request.authorization
     payload = dataclasses.asdict(data) 
     game_id = await validate_game_id(payload["game_id"])
     guessObject = {}
 
-    #Check if game is playable or complete. 
+    # check if game is playable or complete. 
     query = "SELECT * FROM In_Progress where game_id = :game_id"
     app.logger.info("SELECT * FROM In_Progress where game_id = " + str(payload["game_id"]))
     in_progress = await db.fetch_all(query=query, values={"game_id": str(payload["game_id"])})
     if not in_progress:
         return {"message": "Game has been completed already."}
     
-    #Get secret word, format guess word, check if guess word is a valid word. 
+    # get secret word, format guess word, check if guess word is a valid word. 
     app.logger.info("SELECT secretword FROM Game where game_id = " + str(payload["game_id"]))
     query = "SELECT secretword FROM Game where game_id = :game_id"
     secret_word = await db.fetch_one(query=query, values={"game_id": str(payload["game_id"])})
@@ -154,7 +152,7 @@ async def guess(data):
     if len(is_valid_word_v)==0 and len(is_valid_word_c)==0:
         return abort(404, "Not a Valid Word!")
 
-    #Check guess count.
+    # check guess count.
     app.logger.info("SELECT Max(guess_num) FROM Guesses where game_id = " + str(payload["game_id"]))
     query = "SELECT Max(guess_num) FROM Guesses where game_id = :game_id"
     guessEntry = await db.fetch_one(query=query, values={"game_id": str(payload["game_id"])})
@@ -164,7 +162,7 @@ async def guess(data):
     guessCount+=1
     guessObject["count"] = guessCount 
 
-    #Check if guess is the secret word.
+    # check if guess is the secret word.
     if guess_word==secret_word:
         app.logger.info("SELECT guess_word FROM Guesses WHERE game_id = " + str(payload["game_id"]))
         query = "SELECT guess_word FROM Guesses WHERE game_id = :game_id"
@@ -185,7 +183,7 @@ async def guess(data):
         delete_guesses = await db.execute("DELETE FROM Guesses WHERE game_id=:game_id", values={"game_id": str(payload["game_id"])})
         return guessObject,200
 
-    #Guess when the guess is not the secret word.  
+    # guess when the guess is not the secret word.  
     if guessCount<6:
         insert_guess = await db.execute("INSERT INTO Guesses(game_id, guess_num, guess_word) VALUES(:game_id, :guess_num, :guess_word)", values={"game_id": str(payload["game_id"]), "guess_num": guessCount, "guess_word": guess_word})
         app.logger.info("SELECT guess_word FROM Guesses WHERE game_id = " + str(payload["game_id"]))
@@ -203,7 +201,7 @@ async def guess(data):
         guessObject["message"] = "Guess again!"
         return guessObject, 200
 
-    #If this is 6th guess
+    # if this is 6th guess
     else:
         app.logger.info("SELECT guess_word FROM Guesses WHERE game_id = " + str(payload["game_id"]))
         guesses_word = await db.fetch_all("SELECT guess_word FROM Guesses WHERE game_id = :game_id", values={"game_id": str(payload["game_id"])})
@@ -224,10 +222,11 @@ async def guess(data):
         delete_guesses = await db.execute("DELETE FROM Guesses WHERE game_id=:game_id", values={"game_id": str(payload["game_id"])})
         return guessObject, 200
     
-
 # In progress game API
+@tag(["Games"])
 @app.route("/inprogressgame", methods=["GET"])
 async def get_inprogressgame():
+    """ Check in progress. """
     db = await _get_db()
     auth=request.authorization
     app.logger.info("SELECT game_id FROM In_Progress WHERE username = " + str(auth.username))
@@ -243,18 +242,19 @@ async def get_inprogressgame():
     else:
         return {"message": f"There are no in progress games."}
 
-
 # Game Status API
+@tag(["Games"])
 @app.route("/gamestatus/<string:game_id>", methods=["GET"])
 async def game_status(game_id):
+    """ Check game status. """
     db = await _get_db()
     game_id = await validate_game_id(game_id)
 
-    #Check if in completed:
+    # check if in completed:
     app.logger.info("SELECT * FROM Completed WHERE game_id = " + str(game_id[0]))
     game_id_completed = await db.fetch_one("SELECT * FROM Completed WHERE game_id = :game_id", values={"game_id": str(game_id[0])})
 
-    #If not completed:
+    # if not completed:
     if game_id_completed == None:
         app.logger.info("SELECT secretword FROM Game WHERE game_id = " + str(game_id[0]))
         secret_word1 = await db.fetch_one("SELECT secretword FROM Game WHERE game_id = :game_id", values={"game_id": str(game_id[0])})
@@ -287,8 +287,6 @@ async def game_status(game_id):
     
     return guessObject, 200
         
-
-
 # function to compute Guess API and Game status Logic
 async def guess_compute(guess_word, secret_word,positionList):
     for j in guess_word:
@@ -296,13 +294,11 @@ async def guess_compute(guess_word, secret_word,positionList):
         response[j] = "red"
         positionList.append(response)
 
-
     for i in range(5):
         if secret_word[i] in positionList[i].keys():
             positionList[i][list(positionList[i].keys())[0]] = "green"
             secret_word = secret_word[:i] + "_" + secret_word[i+1:]
                                 
-
     for i,j in enumerate(guess_word):
         if j in secret_word and positionList[i][list(positionList[i].keys())[0]] != "green":
             positionList[i][list(positionList[i].keys())[0]] = "yellow"
