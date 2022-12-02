@@ -1,13 +1,12 @@
 
 from cmath import e
-import collections
 import dataclasses
 import textwrap
 import sqlite3
 import databases
 import toml
-import random
-import uuid
+import redis
+import json
 
 from quart import Quart, g, request, abort
 # from quart_auth import basic_auth_required
@@ -19,26 +18,14 @@ QuartSchema(app)
 
 app.config.from_file(f"./etc/{__name__}.toml", toml.load)
 
+leaderboard = redis.Redis()
 
 @dataclasses.dataclass
 class game:
     game_id: str
+    user: str
     game_status: str
     score: int
-
-
-async def _get_db():
-    db = getattr(g, "_sqlite_db", None)
-    if db is None:
-        db = g._sqlite_db = databases.Database(app.config["DATABASES"]["URL"])
-        await db.connect()
-    return db
-
-@app.teardown_appcontext
-async def close_connection(exception):
-    db = getattr(g, "_sqlite_db", None)
-    if db is not None:
-        await db.disconnect()
 
 @app.route("/")
 def index():
@@ -65,7 +52,7 @@ def not_found(e):
     return {"error": "Unauthorized"}, 401
 
 
-# Start of Game API
+# Start of Leaderboard API
 
 @app.errorhandler(404)
 def not_found(e):
@@ -75,15 +62,17 @@ def not_found(e):
 @app.route("/leaderboard", methods=["POST"])
 @validate_request(game)
 async def postgame(data):
-    db = await _get_db()
     auth=request.authorization
     game = dataclasses.asdict(data)
-    
-    try:
-        leaderboard_game = await db.execute("INSERT INTO Leaderboard(game_id, game_status, score) VALUES (:game_id, :game_status, :score)", values=game)
-    except sqlite3.IntegrityError as e:
-        abort(409, e)
+    hash_id = "game_id:" + game["game_id"]
+    game_data = {"user": game["user"], "game_status": game["game_status"], "score": game["score"]}
 
+    #insert data into redis db
+    leaderboard.hset(hash_id, "user", game["user"])
+    leaderboard.hset(hash_id, "game_status", game["game_status"])
+    leaderboard.hset(hash_id, "score", game["score"])
+
+    app.logger.info(leaderboard.hgetall(hash_id))
     return game, 200
 
 

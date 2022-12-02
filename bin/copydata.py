@@ -1,6 +1,7 @@
 # import sqlite3
 import json
 import sqlite3
+import redis
 
 correct_word_file = open("./share/correct.json")
 correct_word = json.load(correct_word_file)
@@ -32,3 +33,6 @@ cursor.execute(valid_str)
 connection.commit()
 correct_word_file.close()
 valid_word_file.close()
+
+leaderboard = redis.Redis()
+leaderboard.flushall()
