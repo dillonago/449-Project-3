@@ -30,10 +30,21 @@ QUART_ENV=development
 ```
 foreman start -m game=3, user=1
 ```
+6. To start the Redis server, run:
+```
+sudo service redis-server start
+```
+## Leaderboard Endpoints
+To add a game to the leaderboard database, send a request using the following format:
+```
+http POST http://127.0.0.1:<port>/leaderboard game_id=11111 user="newuser" game_status="Won in 1 guess" score=6
+ ```
+
 ## Database:
- The var folder holds two Databases:
+ The var folder holds three Databases:
  1. game.db
  2. user.db
+ 3. leaderboard.db
 
 
 1. game.db contains following tables:
@@ -41,11 +52,10 @@ Game,in_progress,Completed,Guessses,Correct_words,valid_words
 
 2. user.db contains following tables:
  User table(containing username & password)
+
+3. leaderboard.db contains following tables:
+Leaderboard (contains game_id, user, game_status, score)
 ## Functionality
-1. Splitting the monolith service into user & game
-2. Authenticating endpoints(via nginx reverse proxy)
-3. Load balancing
-4. Directing traffic
 
 ## Nginx Configuration:
 -configuring nginx to load balance between three games service
