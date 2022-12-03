@@ -100,3 +100,17 @@ async def postgame(data):
 @app.errorhandler(417)
 def not_found(e):
     return {"error": str(e)}, 417
+
+# leaderboard top 10 endpoint.
+@app.route("/leaderboard/top10", methods=["GET"])
+@tag(["Leaderboard"])
+async def get_scores():
+    """ Return top 10 users by score. """
+    # returns bytes sorted by low to high score.
+    scoreboard = leaderboard.zrange("avg_scores", 0, -1)
+    # convert bytes to string.
+    convert = [i.decode() for i in scoreboard]
+    # sort top 10.
+    convert.reverse()
+    # return top 10.
+    return convert[:10], 200
