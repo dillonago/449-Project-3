@@ -62,16 +62,18 @@ async def postgame(data):
     """ Save game result into database. """
     auth=request.authorization
     game = dataclasses.asdict(data)
-    hash_id = "game_id:" + game["game_id"]
-    game_data = {"user": game["user"], "game_status": game["game_status"], "score": game["score"]}
+    game_id = game["game_id"]
+    #insert user and game status into hash at game_id key
+    leaderboard.hset(game_id, "user", game["user"])
+    leaderboard.hset(game_id, "game_status", game["game_status"])
 
-    # insert data into redis db
-    leaderboard.hset(hash_id, "user", game["user"])
-    leaderboard.hset(hash_id, "game_status", game["game_status"])
-    leaderboard.hset(hash_id, "score", game["score"])
+    #insert score into sorted set at game_id key
+    leaderboard.zadd("scores", {game_id: game["score"]})
 
-    app.logger.info(leaderboard.hgetall(hash_id))
+    app.logger.info(leaderboard.hgetall(game_id))
+    app.logger.info(leaderboard.zscore("scores", game_id))
     return game, 200
+
 
 # status code
 @app.errorhandler(417)
