@@ -5,3 +5,4 @@ sqlite3 ./var/primary/mount/game.db< ./share/game.sql
 sqlite3 ./var/leaderboard.db< ./share/leaderboard.sql
 python3 ./bin/copydata.py
 sudo service redis-server start
+python3 ./bin/populateleaderboard.py
