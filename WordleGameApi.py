@@ -28,7 +28,6 @@ class guess:
 
 cycleObj = itertools.cycle(["URL1", "URL2", "URL3"])
 
-
 async def _get_writedb():
     db = getattr(g, "_sqlite_db", None)
     if db is None:

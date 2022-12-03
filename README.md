@@ -1,7 +1,7 @@
 # CPSC449Project2
 
 ## Members of Team: 
-Alejandro Ramos, Shreya Bhattacharya, Dillon Go, Manan Patel
+Ashley Thorlin, Brent Pfefferle, Dillon Go
 
 ## Introduction:
 The goal is to split the monolith service created in Project 1(Wordle) into two seperate services User and Games and authenticating endpoints. In previous version we used HTTP basic authentication for signin endpoint but rest of the endpoints of games remained unauthenticated.
@@ -30,10 +30,22 @@ QUART_ENV=development
 ```
 foreman start -m game=3, user=1
 ```
+6. To start the Redis server, run:
+```
+sudo service redis-server start
+```
+
+## Leaderboard Endpoints
+To add a game to the leaderboard database, send a request using the following format:
+```
+http POST http://127.0.0.1:<port>/leaderboard user="newestuser" result="Won" guesses=3
+ ```
+
 ## Database:
- The var folder holds two Databases:
+ The var folder holds three Databases:
  1. game.db
  2. user.db
+ 3. leaderboard.db
 
 
 1. game.db contains following tables:
@@ -41,21 +53,20 @@ Game,in_progress,Completed,Guessses,Correct_words,valid_words
 
 2. user.db contains following tables:
  User table(containing username & password)
+
+3. leaderboard.db contains following tables:
+Leaderboard (contains game_id, user, game_status, score)
 ## Functionality
-1. Splitting the monolith service into user & game
-2. Authenticating endpoints(via nginx reverse proxy)
-3. Load balancing
-4. Directing traffic
 
 ## Nginx Configuration:
 -configuring nginx to load balance between three games service
 -setting up the server_name pointing to tuffix-vm(in case of Tuffix 2020 VM) 
 -authenticating based on subrequest
 ```
-upstream gameLoad{
-         server 127.0.0.1:5000;
-         server 127.0.0.1:5001;
-         server 127.0.0.1:5002;
+upstream gameLoad {
+       server 127.0.0.1:5100;
+       server 127.0.0.1:5200;
+       server 127.0.0.1:5300;
 }
 
 server {
@@ -63,23 +74,27 @@ server {
        listen [::]:80;
 
        server_name tuffix-vm;
-       
+
        location / {
-                  proxy_pass http://gameLoad;
-                  auth_request /auth;
-                  auth_request_set $auth_status $upstream_status;
+               proxy_pass http://gameLoad;
+               auth_request /auth;
+               auth_request_set $auth_status $upstream_status;
        }
-       
+
        location /user{
-                  proxy_pass http://127.0.0.1:5100;
-       }   
+               proxy_pass http://127.0.0.1:5000;
+       }
+
+       location /leaderboard{
+               proxy_pass http://127.0.0.1:5400;
+       }
 
        location = /auth {
-                  internal;
-                  proxy_pass http://127.0.0.1:5100;
-                  proxy_pass_request_body off;
-                  proxy_set_header Content-Length "";
-                  proxy_set_header X-Original-URI $request_uri;
+                internal;
+                proxy_pass http://127.0.0.1:5000;
+                proxy_pass_request_body off;
+                proxy_set_header Content-Length "";
+                proxy_set_header X-Original-URI $request_uri;
        }
 }
 ```
