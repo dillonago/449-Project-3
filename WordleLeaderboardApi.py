@@ -6,6 +6,7 @@ import databases
 import toml
 import redis
 import json
+import sys
 from quart import Quart, g, request, abort, jsonify
 from quart_schema import QuartSchema, RequestSchemaValidationError, validate_request, tag
 
@@ -20,10 +21,9 @@ leaderboard = redis.Redis()
 
 @dataclasses.dataclass
 class game:
-    game_id: str
     user: str
-    game_status: str
-    score: int
+    result: str
+    guesses: int
 
 # route endpoint.
 @app.route("/")
@@ -62,16 +62,37 @@ async def postgame(data):
     """ Save game result into database. """
     auth=request.authorization
     game = dataclasses.asdict(data)
-    game_id = game["game_id"]
-    #insert user and game status into hash at game_id key
-    leaderboard.hset(game_id, "user", game["user"])
-    leaderboard.hset(game_id, "game_status", game["game_status"])
+    user = game["user"]
 
-    #insert score into sorted set at game_id key
-    leaderboard.zadd("scores", {game_id: game["score"]})
+    #calculate score
+    if game["result"] == "Lost":
+        score = 0
+    else:
+        score = 7 - game["guesses"]
 
-    app.logger.info(leaderboard.hgetall(game_id))
-    app.logger.info(leaderboard.zscore("scores", game_id))
+    #retrieve current user's stats
+    try:
+        games_played = leaderboard.hget("games_played", user)
+        games_played = int(games_played) + 1
+        total_score = leaderboard.hget("total_scores", user)
+        total_score = int(total_score) + score
+    except:
+        games_played = 1
+        total_score = score
+
+    #increment games_played and total_score in hash at user key
+    leaderboard.hset("games_played", user, games_played)
+    leaderboard.hset("total_scores", user, total_score)
+    
+    #process input and calculate average score
+    avg_score = total_score/games_played
+    
+    #update avg_score in sorted set "avg_scores" at user key
+    leaderboard.zadd("avg_scores", {user: avg_score})
+
+    app.logger.info(leaderboard.hget("games_played", user))
+    app.logger.info(leaderboard.hget("total_scores", user))
+    app.logger.info(leaderboard.zscore("avg_scores", user))
     return game, 200
 
 

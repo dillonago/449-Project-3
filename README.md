@@ -34,10 +34,11 @@ foreman start -m game=3, user=1
 ```
 sudo service redis-server start
 ```
+
 ## Leaderboard Endpoints
 To add a game to the leaderboard database, send a request using the following format:
 ```
-http POST http://127.0.0.1:<port>/leaderboard game_id=11111 user="newuser" game_status="Won in 1 guess" score=6
+http POST http://127.0.0.1:<port>/leaderboard user="newestuser" result="Won" guesses=3
  ```
 
 ## Database:
