@@ -32,3 +32,4 @@ cursor.execute(valid_str)
 connection.commit()
 correct_word_file.close()
 valid_word_file.close()
+

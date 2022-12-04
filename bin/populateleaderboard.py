@@ -1,6 +1,7 @@
 import redis
 
 leaderboard = redis.Redis()
+leaderboard.flushdb()
 
 def addgame(game):
     user = game["user"]
