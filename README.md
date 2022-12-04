@@ -4,16 +4,13 @@
 Ashley Thorlin, Brent Pfefferle, Dillon Go
 
 ## Introduction:
-The goal is to split the monolith service created in Project 1(Wordle) into two seperate services User and Games and authenticating endpoints. In previous version we used HTTP basic authentication for signin endpoint but rest of the endpoints of games remained unauthenticated.
-So, here we are using nginx reverse proxy to handle authentication.It will also act as API gateway for directing respective traffic, load balancing and authenticating request to game service.
+Previously, we split the monolith service created in Project 1(Wordle) into two seperate services User and Games and authenticating endpoints. In previous version we used HTTP basic authentication for signin endpoint but rest of the endpoints of games remained unauthenticated.
+
+For this project, we added replicas of the game database and distributed reads. We also implemented a leaderboard service that takes the average score for each user and places them in a leaderboard where you can see the top 10. 
 
 ## Steps to run our program:
-1. Navigate to the correct directory of the project file. 
-2. To initialize the database, we will run it by running these lines of code:
-```
-./bin/init.sh
-```
-3. Configure Nginx:
+1. Navigate to the correct directory of the project file and make sure you have redis installed.  
+2. Configure Nginx:
 ```
 cd /etc/nginx/sites-enabled
 sudo "${EDITOR:-vi}" tutorial
@@ -22,30 +19,33 @@ Then paste code in the "Nginx Configuration section, then run:
 ```
 sudo service nginx restart
 ```
-4. For logging, create a .env file with this inside:
+3. For logging, create a .env file with this inside:
 ```
 QUART_ENV=development
 ```
-5. To start the service, run this line of code:
+4. To start the service, run this line of code:
 ```
-foreman start -m game=3, user=1
+foreman start
 ```
-6. To start the Redis server, run:
+5. To initialize the databases and redis server, we will run it by running these lines of code:
 ```
-sudo service redis-server start
+./bin/init.sh
 ```
 
 ## Leaderboard Endpoints
 To add a game to the leaderboard database, send a request using the following format:
 ```
-http POST http://127.0.0.1:<port>/leaderboard user="newestuser" result="Won" guesses=3
- ```
+http POST http://tuffix-vm/leaderboard user="newestuser" result="Won" guesses=3
+```
+To view the top 10, run this command:
+```
+http GET http://tuffix-vm/leaderboard/top10
+```
 
 ## Database:
- The var folder holds three Databases:
+ The var folder holds two Databases:
  1. game.db
  2. user.db
- 3. leaderboard.db
 
 
 1. game.db contains following tables:
@@ -53,10 +53,6 @@ Game,in_progress,Completed,Guessses,Correct_words,valid_words
 
 2. user.db contains following tables:
  User table(containing username & password)
-
-3. leaderboard.db contains following tables:
-Leaderboard (contains game_id, user, game_status, score)
-## Functionality
 
 ## Nginx Configuration:
 -configuring nginx to load balance between three games service
@@ -98,4 +94,6 @@ server {
        }
 }
 ```
+
+
 

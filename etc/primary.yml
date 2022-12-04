@@ -14,7 +14,7 @@ static:
   primary: true
 
   # Required. Hostname of the primary node.
-  hostname: "parallels-Parallels-Virtual-Platform"
+  hostname: "tuffix-vm"
 
   # Required. The API URL of the primary node.
-  advertise-url: "http://parallels-Parallels-Virtual-Platform:20202"
+  advertise-url: "http://tuffix-vm:20202"

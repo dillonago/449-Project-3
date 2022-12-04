@@ -15,8 +15,6 @@ QuartSchema(app, tags=[
     {"name": "Root", "description": "Root path."},
     {"name": "Leaderboard", "description": "APIs for leaderboard."}])
 
-app.config.from_file(f"./etc/{__name__}.toml", toml.load)
-
 leaderboard = redis.Redis()
 
 @dataclasses.dataclass
